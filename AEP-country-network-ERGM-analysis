@@ -1,0 +1,229 @@
+rm()
+rm(list = ls())
+library(statnet)
+
+Hum_edgelist=read.csv("organisation.csv", header=TRUE)
+head(Hum_edgelist)
+
+Hum_edge_matrix <- as.matrix(Hum_edgelist)
+Hum_network= as.network(Hum_edge_matrix,loops = FALSE, bipartite = 94)
+
+plot(Hum_network)
+gplot(Hum_network, 
+      gmode="twomode", 
+      usearrows = FALSE, 
+      displaylabels = TRUE, 
+      edge.col="gray")
+bipartite_matrix <- as.matrix(Hum_network)
+View(bipartite_matrix)
+Org_mat <- bipartite_matrix %*% t(bipartite_matrix)
+Country_mat=t(bipartite_matrix) %*% bipartite_matrix
+View(Org_mat)
+View(Country_mat)
+
+Org_mat[Org_mat>1]=1
+
+########################### country network
+country_attri= read.csv("BUAN SNA ANALYSIS.csv", stringsAsFactors=FALSE)
+Country_network= as.network(Country_mat, loops = FALSE)
+summary(Country_network)
+plot(Country_network)
+gplot(Country_network,
+      usearrows = FALSE, 
+      displaylabels = TRUE, 
+      edge.col="gray")
+
+#################### organization network 
+org_network= as.network(Org_mat)
+plot(org_network)
+gplot(org_network,
+      usearrows = FALSE, 
+      displaylabels = TRUE, 
+      edge.col="gray")
+
+
+##########################Network Level Statistics ####################
+
+#### Network level characteristics
+gden(Country_network)
+grecip(Country_network)
+
+centralization(Country_network, closeness)
+centralization(Country_network, betweenness)
+centralization(Country_network, evcent)
+centralization(Country_network, degree, cmode="indegree")
+centralization(Country_network, degree, cmode="outdegree")
+
+isSymmetric(Country_mat)
+
+dyad.census(Country_network)
+triad.census(Country_network)
+clique.census(Country_network)
+components(Country_network)
+component.dist(Country_network)
+isolates(Country_network)
+
+#####Node level attributes
+Country_network_degree <-degree(Country_network)
+hist(Country_network_degree)
+
+Country_network_indegree <- degree(Country_network
+                                   , cmode="indegree")
+hist(Country_network_indegree)
+
+Country_network_outdegree <- degree(Country_network, cmode="outdegree")
+hist(Country_network_outdegree)
+
+Country_network_closeness <- closeness(Country_network, cmode= "directed")
+summary(Country_network_closeness)
+
+Country_network_betweenness <- betweenness(Country_network, cmode= "directed")
+summary(Country_network_betweenness)
+
+Country_network_evcent <- evcent(Country_network, gmode= "digraph")
+summary(Country_network_evcent)
+
+centrality_measures <- data.frame(indegree=Country_network_indegree, outdegree=Country_network_outdegree, closeness=Country_network_closeness, betweenness=Country_network_betweenness, evcent=Country_network_evcent)
+cor(centrality_measures)
+write.table(Country_network_degree, file = "central.csv", sep = ",")
+
+Count_Density=gden(Country_network)
+Count_Density
+Org_density=gden(org_network)
+Org_density
+Count_recipro= grecip(Country_network, measure="edgewise")
+Org_recipro= grecip(org_network, measure="edgewise")
+Count_trans=gtrans(Country_network)
+Org_trans=gtrans(org_network)
+
+centralization(Country_network, degree, cmode="indegree")   
+Count_cent=centralization(Country_network, betweenness)   #error
+clique.census(Country_network)
+dyad.census(Country_network)#error
+triad.census(Country_network)
+
+components(Country_network) #error
+degree(Country_network, cmode = "indegree")
+
+network.size(Country_network)
+nrow(country_attri)
+network.vertex.names(Country_network)
+country_attri$Nodes
+
+cat("Network size (vertices):", network.size(Country_network), "\n")
+cat("Attribute rows (country_attri):", nrow(country_attri), "\n")
+cat("Vertex names (first 10):\n"); print(head(network.vertex.names(Country_network),10))
+cat("Attribute names column preview (first 10):\n"); print(head(as.character(country_attri$Nodes),10))
+
+# 1. Raw name vectors (exact strings, no cleaning)
+net_names_raw  <- network.vertex.names(Country_network)
+attr_names_raw <- as.character(country_attri$Nodes)   # change 'Nodes' if your column is named differently
+
+# 2. Intersection (exact-match)
+common_names <- intersect(net_names_raw, attr_names_raw)
+
+cat("Network vertices:", length(net_names_raw), "\n")
+cat("Attribute rows:", length(attr_names_raw), "\n")
+cat("Exact-common countries:", length(common_names), "\n\n")
+
+cat("Sample common names (first 20):\n")
+print(head(common_names, 20))
+
+# 3. Filter attribute table to only those exact-common names
+country_attri_filtered <- country_attri[country_attri$Nodes %in% common_names, , drop = FALSE]
+
+# 4. Drop network vertices that are NOT in the attribute file (so network and attributes align)
+to_drop <- which(!(net_names_raw %in% common_names))
+if(length(to_drop) > 0){
+  cat("Dropping", length(to_drop), "network vertices that have no exact attribute match.\n")
+  Country_network <- delete.vertices(Country_network, to_drop)
+} else {
+  cat("No vertices to drop from network (all network vertices have exact attribute rows).\n")
+}
+
+# 5. Recompute network names and reorder attribute rows to network order (exact-match)
+net_names_raw <- network.vertex.names(Country_network)   # updated after possible drop
+match_idx <- match(net_names_raw, country_attri_filtered$Nodes)  # should be all non-NA now
+
+if(any(is.na(match_idx))){
+  stop("ERROR: After dropping unmatched vertices, some network vertex names STILL don't match attribute rows exactly. Inspect the following network names:\n",
+       paste(net_names_raw[is.na(match_idx)], collapse = ", "))
+}
+
+# reorder attribute rows to the same order as vertices
+country_attri_filtered <- country_attri_filtered[match_idx, , drop = FALSE]
+
+cat("\nFinal network size:", network.size(Country_network), "\n")
+cat("Final attribute rows (filtered):", nrow(country_attri_filtered), "\n")
+cat("Vertex attributes now present:\n")
+print(list.vertex.attributes(Country_network))
+print(sapply(list.vertex.attributes(Country_network), function(a) length(get.vertex.attribute(Country_network, a))))
+print(sapply(list.vertex.attributes(Country_network), function(a) sum(is.na(get.vertex.attribute(Country_network, a)))))
+
+
+#############setting vertex attributes
+region= country_attri$Global.Region
+School_Drop_all= country_attri$OoSchool_per
+School_Drop_F= as.numeric(country_attri$OoSchool_per_F)
+GDP= scale(as.numeric(country_attri$GDP))
+Electricity_access= country_attri$`Access to electricity (% of population)` 
+Education_index= country_attri$`Education Index (2023)`
+Political_stability= country_attri$`Political Stability`
+Female_LF= country_attri$`Femal Labour Force Participation Rate`
+
+Country_network%v%"region"=region
+Country_network%v%"School_Drop_all"=School_Drop_all
+Country_network%v%"School_Drop_F"=School_Drop_F
+Country_network%v%"GDP"=GDP
+Country_network%v%"Electricity_access"=Electricity_access
+Country_network%v%"Education_index"=Education_index
+Country_network%v%"Political_stability"=Political_stability
+Country_network%v%"Female_LF"=Female_LF
+
+###############ERGM Model##############
+
+
+Model_01 <-   ergm(Country_network~edges,control=control.ergm(seed=12345)) 
+summary(Model_01) 
+
+
+Model_02 <-   ergm(Country_network~edges+idegree(0),control=control.ergm(seed=12345)) 
+summary(Model_02) 
+
+##########################ERGM with exogenous##############################
+
+
+Model_04=ergm(Country_network~edges+  
+                + nodeicov("GDP")+nodematch("region",diff=FALSE)+nodefactor("region"),control=control.ergm(seed=12345))
+
+
+summary(Model_04)
+
+Model_05=ergm(Country_network~edges+  +nodeicov("Electricity_access")+nodeicov("Education_index")+nodeicov("Political_stability")+nodeicov("Female_LF")
+              + nodeicov("GDP")+nodematch("region",diff=FALSE)+nodefactor("region"),control=control.ergm(seed=12345))
+summary(Model_05)
+####MCMC Diagonistics#
+Model_05_MCMC_Diagnostics <‐ gof(Model_05, GOF=~model)
+Model_05_MCMC_Diagnostics
+
+######GOODNESS OF FIT###
+Model_05_GOF <‐ gof(Model_05, GOF=~distance + espartners + idegree + triadcensus,
+                    verbose=TRUE, interval=5e+4, control.gof.ergm(12345))
+
+
+pdf('Model_05_GOF.pdf')
+par(mfrow=c(2,2))
+plot(Model_05_GOF, cex.lab=1.6, cex.axis=1.6, plotlogodds=TRUE)
+dev.off()
+
+
+####MCMC Diagonistics#
+Model_04_MCMC_Diagnostics <‐ gof(Model_04, GOF=~model)
+Model_04_MCMC_Diagnostics
+
+######GOODNESS OF FIT###
+Model_04_GOF <‐ gof(Model_04, GOF=~distance + espartners + idegree + triadcensus,
+                    verbose=TRUE, interval=5e+4, control.gof.ergm(12345))
+
+
+pdf('Model_04_MCMCgof.pdf')
