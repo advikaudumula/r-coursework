@@ -1,0 +1,105 @@
+
+library(statnet)
+
+#read CSV file
+Sample_Edgelist  <- read.csv("SNA class data - Sheet1.csv", header=FALSE)
+
+
+#Convert the edges to matrix 
+Sample_Edgelist_Matrix <- as.matrix(Sample_Edgelist)
+
+# convert matrix to network
+Sample_Edgelist_Network <- as.network(Sample_Edgelist_Matrix, loops = FALSE, bipartite=30)
+#view the bipartitte matrix
+bipartite_matrix <- as.matrix(Sample_Edgelist_Network)
+View(bipartite_matrix)
+#Sample_Edgelist_Network[1,]
+#delete.vertices(Sample_Edgelist_Network, 1)
+summary(Sample_Edgelist_Network)
+plot.network(Sample_Edgelist_Network)
+gplot(Sample_Edgelist_Network, 
+      gmode="twomode", 
+      usearrows = FALSE, 
+      displaylabels = TRUE, 
+      edge.col="gray", label.cex = 0.5)
+
+Stu_mat <- bipartite_matrix %*% t(bipartite_matrix)
+Sub_mat=t(bipartite_matrix) %*% bipartite_matrix
+View(Sub_mat)
+View(Stu_mat)
+
+#Stu_mat[Stu_mat>1]=1
+Student_network= as.network(Stu_mat, loops = FALSE)
+Subject_network= as.network(Sub_mat, loops = FALSE)
+network(Student_network)
+summary(Student_network)
+plot(Student_network)
+gplot(Student_network,
+      usearrows = FALSE, 
+      displaylabels = TRUE, 
+      edge.col="gray")
+
+plot(Subject_network)
+gplot(Subject_network,
+      usearrows = FALSE, 
+      displaylabels = TRUE,label.pos = 1, 
+      edge.col="gray", label.cex = 0.5)
+
+
+##############Calculating network parameters 
+degree_centrality <- degree(Subject_network, gmode = "graph")
+bet_centrality <- betweenness(Subject_network, gmode = "graph")
+close_centrality <- closeness(Subject_network, gmode = "graph")
+eigen_centrality <- evcent(Subject_network, gmode = "graph")
+
+node_names <- network.vertex.names(Subject_network)
+Subject_centrality_stats <- data.frame(
+  Node = node_names,
+  Degree = round(degree_centrality, 2),
+  Betweenness = round(bet_centrality, 2),
+  Closeness = round(close_centrality, 2),
+  Eigenvector = round(eigen_centrality, 2)
+)
+
+View(Subject_centrality_stats)
+
+
+####Calculating same for student network###
+
+degree_centrality2 <- degree(Student_network, gmode = "graph")
+bet_centrality2 <- betweenness(Student_network, gmode = "graph")
+close_centrality2 <- closeness(Student_network, gmode = "graph")
+eigen_centrality2 <- evcent(Student_network, gmode = "graph")
+
+node_names2 <- network.vertex.names(Student_network)
+Student_centrality_stats<- data.frame(
+  Node = node_names2,
+  Degree = round(degree_centrality2, 2),
+  Betweenness = round(bet_centrality2, 2),
+  Closeness = round(close_centrality2, 2),
+  Eigenvector = round(eigen_centrality2, 2)
+)
+
+View(Student_centrality_stats)
+
+write.csv(Subject_centrality_stats, "Subject_network_centrality.csv", row.names = FALSE)
+
+########interpretation
+
+###top 5 in each area.
+
+head(Subject_centrality_stats[order(-Subject_centrality_stats$Degree), ], 5)
+
+head(Subject_centrality_stats[order(-Subject_centrality_stats$Betweenness), ], 5)
+head(Subject_centrality_stats[order(-Subject_centrality_stats$Closeness), ], 5)
+head(Subject_centrality_stats[order(-Subject_centrality_stats$Eigenvector), ], 5)
+
+Subject_network_degree <-degree(Subject_network)
+hist(Subject_network_degree)
+Sub_Density=gden(Subject_network)
+Sub_Density
+
+Student_network_degree <-degree(Student_network)
+hist(Student_network_degree)
+Sub_Density=gden(Student_network)
+Sub_Density
